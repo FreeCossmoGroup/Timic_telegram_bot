@@ -1,7 +1,7 @@
 import sys
 from Tools.config import load_config_to_bot, save_default_config
 from Core.Bot import Bot
-
+from Web.api_requests import create_task
 
 if __name__ == '__main__':
     args = sys.argv
@@ -20,7 +20,6 @@ if __name__ == '__main__':
     else:
         print("fatal: invalid command line argument")
         exit(1)
-
     BotInstance = Bot(telegram_api_token)
     load_config_to_bot(BotInstance.bot_info)
     BotInstance.bot.infinity_polling()

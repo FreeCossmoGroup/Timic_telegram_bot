@@ -42,6 +42,10 @@ class Bot(object):
                         handle_user_authentication(message, bot, bot_info)
                     elif bot_info.state == UserState.CHOOSE_ACTION:
                         handle_user_choose_action(message, bot, bot_info)
+                    elif bot_info.state == UserState.USE_API:
+                        handle_user_choose_api_command(message, bot, bot_info)
+                    elif bot_info.state == UserState.CREATE_TASK:
+                        handle_user_api_create_task(message, bot, bot_info)
                 else:
                     assert False
             except Exception as e:

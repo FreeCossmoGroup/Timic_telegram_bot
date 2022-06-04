@@ -13,6 +13,13 @@ class UserState(Enum):
     USE_API = 3
     AUTHENTICATION = 4
     CHOOSE_ACTION = 5
+    CREATE_TASK = 6
+    MODIFY_TASK = 7
+
+
+class QueryType(Enum):
+    CREATE_TASK = 1
+    MODIFY_TASK = 2
 
 
 class AdminState(Enum):
@@ -89,6 +96,7 @@ class BotInfo(object):
         self.state = None
         self.user_table = None
         self.admin_key = None
+        self.query_info = None
 
     def set_state(self, state):
         self.state = state
@@ -108,3 +116,41 @@ class BotInfo(object):
 
     def set_admin_key(self, admin_key: str):
         self.admin_key = admin_key
+
+
+### requests data:
+server_address = "http://localhost:8080"
+
+description = 'description'
+start_time = 'start_time'
+duration = 'duration'
+fixed = 'fixed'
+parent = 'parent'
+
+default_parameter_value = '-'
+
+
+def get_create_task_parameters() -> dict:
+    return dict({description: '', start_time: '', duration: '', fixed: '', parent: ''})
+
+
+class QueryInfo:
+    def __init__(self, type: QueryType):
+        self.query_type = type
+
+        if type == QueryType.CREATE_TASK:
+            self.query_parameters = get_create_task_parameters()
+            self.parameter_count = len(self.query_parameters)
+            self.cur_parameter_idx = 0
+        if type == QueryType.MODIFY_TASK:
+            pass
+
+    def next_parameter(self):
+        self.cur_parameter_idx += 1
+
+        if self.cur_parameter_idx >= self.parameter_count:  # it was last parameter
+            return None
+        return self.cur_parameter_idx
+
+    def get_cur_parameter(self):
+        return list(self.query_parameters.keys())[self.cur_parameter_idx]

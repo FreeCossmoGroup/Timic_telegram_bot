@@ -1,8 +1,9 @@
-from Core.Data import Mode, UserState, AdminState, BotInfo
+from Core.Data import Mode, UserState, AdminState, BotInfo, QueryInfo, QueryType, default_parameter_value
 from Tools.config import save_config_from_bot
 import telebot
 
 from Tools.View import *
+from Web.api_requests import create_task
 
 
 def handle_login_message(message, bot: telebot.TeleBot, bot_info: BotInfo):
@@ -115,12 +116,43 @@ def handle_user_choose_action(message, bot: telebot.TeleBot, bot_info: BotInfo):
 
     if text == USE_API:
         bot_info.change_handler_info(Mode.USER, UserState.USE_API)
-        bot.send_message(bot_info.chat_id, "choose command:")
+        bot.send_message(bot_info.chat_id, "choose command:", reply_markup=chooseApiCommandMarkup)
     elif text == LOGOUT:
         bot_info.change_handler_info(Mode.LOGIN, None)
         bot.send_message(bot_info.chat_id, "logout from 'User'", reply_markup=chooseModeMarkup)
     else:
         raise Exception("choose suggested command")
+
+
+def handle_user_choose_api_command(message, bot: telebot.TeleBot, bot_info: BotInfo):
+    text = message.text
+
+    if text == CREATE_TASK:
+        bot_info.query_info = QueryInfo(QueryType.CREATE_TASK)
+        bot_info.change_handler_info(Mode.USER, UserState.CREATE_TASK)
+        bot.send_message(bot_info.chat_id, "enter " + str(bot_info.query_info.get_cur_parameter()) + ":")
+    elif text == MODIFY_TASK:
+        bot_info.query_info = QueryInfo(QueryType.MODIFY_TASK)
+        bot_info.change_handler_info(Mode.USER, UserState.MODIFY_TASK)
+
+
+def handle_user_api_create_task(message, bot: telebot.TeleBot, bot_info: BotInfo):
+    text = message.text
+    cur_parameter = bot_info.query_info.get_cur_parameter()
+
+    if text == default_parameter_value:
+        pass
+    else:
+        bot_info.query_info.query_parameters[cur_parameter] = text
+
+    if bot_info.query_info.next_parameter() is None:    # check is the last parameter was initialized
+        response = create_task(bot_info.query_info.query_parameters)   # send request
+        bot.send_message(bot_info.chat_id, "task created: ")
+        bot.send_message(bot_info.chat_id, str(response))    ### TODO: remove later
+        bot_info.change_handler_info(Mode.USER, UserState.USE_API)
+        bot.send_message(bot_info.chat_id, "choose command: ", reply_markup=chooseApiCommandMarkup)
+    else:
+        bot.send_message(bot_info.chat_id, "enter " + str(bot_info.query_info.get_cur_parameter()) + ":")
 
 
 def handle_user_authentication(message, bot: telebot.TeleBot, bot_info: BotInfo):

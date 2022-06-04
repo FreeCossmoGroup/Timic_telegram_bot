@@ -10,6 +10,9 @@ USE_API = "Use API"
 ADMIN = 'Admin'
 USER = 'User'
 
+CREATE_TASK = 'Create Task'
+MODIFY_TASK = 'Modify Task'
+
 
 class ChooseModeMarkup(object):
     def __init__(self):
@@ -37,6 +40,15 @@ class ChooseUserActionMarkup(object):
         self.markup.row(button1, button2)
 
 
+class ChooseApiCommandMarkup(object):
+    def __init__(self):
+        self.markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+        button1 = types.KeyboardButton(CREATE_TASK)
+        button2 = types.KeyboardButton(MODIFY_TASK)
+        self.markup.row(button1, button2)
+
+
 chooseModeMarkup = ChooseModeMarkup().markup
 chooseAdminActionMarkup = ChooseAdminActionMarkup().markup
 chooseUserActionMarkup = ChooseUserActionMarkup().markup
+chooseApiCommandMarkup = ChooseApiCommandMarkup().markup
