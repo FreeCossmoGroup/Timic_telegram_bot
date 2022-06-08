@@ -1,6 +1,10 @@
+import telebot
 from telebot import types
+from Tools.markdown_constructor import *
 
 # Buttons text:
+from Tools.response_info import TASKS_LIST
+
 RESET_KEY = 'Reset Key'
 REMOVE_USER = 'Remove User'
 ADD_USER = 'Add User'
@@ -12,6 +16,21 @@ USER = 'User'
 
 CREATE_TASK = 'Create Task'
 MODIFY_TASK = 'Modify Task'
+GET_ALL_TASKS = 'Get All Tasks'
+
+
+def display_task(bot: telebot.TeleBot, chat_id, task):
+    content = get_bold_markdown(dict(task))
+    bot.send_message(chat_id, content, parse_mode='MARKDOWN')
+
+
+def display_tasks(bot: telebot.TeleBot, chat_id, response):
+    tasks_list = response[TASKS_LIST]
+
+    for i in range(len(tasks_list)):
+        task = tasks_list[i]
+        bot.send_message(chat_id, "*Task " + str(i) + "*:\n", parse_mode='MARKDOWN')
+        display_task(bot, chat_id, task)
 
 
 class ChooseModeMarkup(object):
@@ -45,7 +64,8 @@ class ChooseApiCommandMarkup(object):
         self.markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         button1 = types.KeyboardButton(CREATE_TASK)
         button2 = types.KeyboardButton(MODIFY_TASK)
-        self.markup.row(button1, button2)
+        button3 = types.KeyboardButton(GET_ALL_TASKS)
+        self.markup.row(button1, button2, button3)
 
 
 chooseModeMarkup = ChooseModeMarkup().markup

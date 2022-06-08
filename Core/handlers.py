@@ -3,7 +3,8 @@ from Tools.config import save_config_from_bot
 import telebot
 
 from Tools.View import *
-from Web.api_requests import create_task
+from Tools.response_info import FAIL, STATUS, EXCEPTION
+from Web.api_requests import *
 
 
 def handle_login_message(message, bot: telebot.TeleBot, bot_info: BotInfo):
@@ -131,9 +132,20 @@ def handle_user_choose_api_command(message, bot: telebot.TeleBot, bot_info: BotI
         bot_info.query_info = QueryInfo(QueryType.CREATE_TASK)
         bot_info.change_handler_info(Mode.USER, UserState.CREATE_TASK)
         bot.send_message(bot_info.chat_id, "enter " + str(bot_info.query_info.get_cur_parameter()) + ":")
+    elif text == GET_ALL_TASKS:
+        bot_info.query_info = QueryInfo(QueryType.GET_ALL_TASKS)
+        bot.send_message(bot_info.chat_id, "**created tasks:**", parse_mode='MARKDOWN')
+        handle_user_api_get_all_tasks(bot, bot_info)
     elif text == MODIFY_TASK:
         bot_info.query_info = QueryInfo(QueryType.MODIFY_TASK)
         bot_info.change_handler_info(Mode.USER, UserState.MODIFY_TASK)
+
+
+def handle_user_api_get_all_tasks(bot: telebot.TeleBot, bot_info: BotInfo):
+    # print all tasks
+    response = get_all_tasks()
+    display_tasks(bot, bot_info.chat_id, response)
+    bot.send_message(bot_info.chat_id, "choose command: ", reply_markup=chooseApiCommandMarkup)
 
 
 def handle_user_api_create_task(message, bot: telebot.TeleBot, bot_info: BotInfo):
@@ -147,8 +159,13 @@ def handle_user_api_create_task(message, bot: telebot.TeleBot, bot_info: BotInfo
 
     if bot_info.query_info.next_parameter() is None:    # check is the last parameter was initialized
         response = create_task(bot_info.query_info.query_parameters)   # send request
-        bot.send_message(bot_info.chat_id, "task created: ")
-        bot.send_message(bot_info.chat_id, str(response))    ### TODO: remove later
+        print(response)
+
+        if response[STATUS] == FAIL:
+            bot.send_message(bot_info.chat_id, "*API exception:*\n" + response[EXCEPTION], parse_mode="MARKDOWN")
+        else:
+            bot.send_message(bot_info.chat_id, "*task created:*", parse_mode='MARKDOWN')
+            display_task(bot, bot_info.chat_id, response[TASKS_LIST][0])
         bot_info.change_handler_info(Mode.USER, UserState.USE_API)
         bot.send_message(bot_info.chat_id, "choose command: ", reply_markup=chooseApiCommandMarkup)
     else:

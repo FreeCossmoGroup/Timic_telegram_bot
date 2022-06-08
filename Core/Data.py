@@ -20,6 +20,7 @@ class UserState(Enum):
 class QueryType(Enum):
     CREATE_TASK = 1
     MODIFY_TASK = 2
+    GET_ALL_TASKS = 3
 
 
 class AdminState(Enum):
