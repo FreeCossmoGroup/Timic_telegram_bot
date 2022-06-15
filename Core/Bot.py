@@ -46,6 +46,10 @@ class Bot(object):
                         handle_user_choose_api_command(message, bot, bot_info)
                     elif bot_info.state == UserState.CREATE_TASK:
                         handle_user_api_create_task(message, bot, bot_info)
+                    elif bot_info.state == UserState.MODIFY_TASK:
+                        handle_user_api_modify_task(message, bot, bot_info)
+                    elif bot_info.state == UserState.MODIFY_TASK_PROCESS:
+                        handle_user_api_modify_task_process(message, bot, bot_info)
                 else:
                     assert False
             except Exception as e:

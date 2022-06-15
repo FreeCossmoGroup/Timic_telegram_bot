@@ -1,5 +1,18 @@
 from enum import Enum
 
+server_address = "http://localhost:8080"
+
+description = 'description'
+start_time = 'stime'
+duration = 'duration'
+fixed = 'fixed'
+parent = 'parent'
+id = 'id'
+
+default_parameter_value = '-'
+create_task_body = {description: '', start_time: '', duration: '', fixed: '', parent: ''}
+modify_task_body = {id: '', description: '', start_time: '', duration: '', fixed: '', parent: ''}
+
 
 class Mode(Enum):
     USER = 1
@@ -15,6 +28,7 @@ class UserState(Enum):
     CHOOSE_ACTION = 5
     CREATE_TASK = 6
     MODIFY_TASK = 7
+    MODIFY_TASK_PROCESS = 8
 
 
 class QueryType(Enum):
@@ -97,7 +111,12 @@ class BotInfo(object):
         self.state = None
         self.user_table = None
         self.admin_key = None
+
+        # cached info:
         self.query_info = None
+        self.tasks_view_info = None
+        self.choose_task_info = None
+        self.tasks_list = None
 
     def set_state(self, state):
         self.state = state
@@ -118,33 +137,36 @@ class BotInfo(object):
     def set_admin_key(self, admin_key: str):
         self.admin_key = admin_key
 
-
-### requests data:
-server_address = "http://localhost:8080"
-
-description = 'description'
-start_time = 'start_time'
-duration = 'duration'
-fixed = 'fixed'
-parent = 'parent'
-
-default_parameter_value = '-'
+    def get_task(self, task_id):
+        for task in self.tasks_list:
+            if task[id] == task_id:
+                return task
+        return None
 
 
-def get_create_task_parameters() -> dict:
-    return dict({description: '', start_time: '', duration: '', fixed: '', parent: ''})
+def get_create_task_parameters():
+    return dict(create_task_body)
+
+
+def get_modify_task_parameters():
+    return dict(modify_task_body)
+
+
+def get_task_parameters(type: QueryType):
+    if type == QueryType.CREATE_TASK:
+        return get_create_task_parameters()
+    elif type == QueryType.MODIFY_TASK:
+        return get_modify_task_parameters()
 
 
 class QueryInfo:
     def __init__(self, type: QueryType):
         self.query_type = type
 
-        if type == QueryType.CREATE_TASK:
-            self.query_parameters = get_create_task_parameters()
+        if type == QueryType.CREATE_TASK or type == QueryType.MODIFY_TASK:
+            self.query_parameters = get_task_parameters(type)
             self.parameter_count = len(self.query_parameters)
             self.cur_parameter_idx = 0
-        if type == QueryType.MODIFY_TASK:
-            pass
 
     def next_parameter(self):
         self.cur_parameter_idx += 1
@@ -155,3 +177,35 @@ class QueryInfo:
 
     def get_cur_parameter(self):
         return list(self.query_parameters.keys())[self.cur_parameter_idx]
+
+
+def get_task_info_text(task):
+    char_count = 10
+    descr = task[description][:char_count]
+
+    return str(task[id]) + "\n" + descr
+
+
+class TaskViewInfo:
+    def __init__(self, tasks: list):
+        self.block_size = 4         # count of tasks on screen
+        self.tasks_info = []
+
+        block_idx = -1
+
+        for i in range(len(tasks)):
+            task = tasks[i]
+
+            if i % self.block_size == 0:
+                block_idx += 1
+                self.tasks_info.append(set())
+            self.tasks_info[block_idx].add(get_task_info_text(task))
+
+        self.block_count = len(self.tasks_info)
+        self.block_idx = 0
+
+    def get_task_id(self, text):
+        for block in self.tasks_info:
+            if text in block:
+                return text.split()[0]
+        return None

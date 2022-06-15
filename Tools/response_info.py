@@ -8,6 +8,7 @@ FIXED = 'fixed'
 PARENT = 'parent'
 START_TIME_STRING = 'startTimeString'
 EXCEPTION = 'exception'
+ID = 'id'
 
 # status:
 FAIL = 1

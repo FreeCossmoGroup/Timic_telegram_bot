@@ -1,6 +1,7 @@
 import telebot
 from telebot import types
 from Tools.markdown_constructor import *
+from Core.Data import TaskViewInfo
 
 # Buttons text:
 from Tools.response_info import TASKS_LIST
@@ -18,6 +19,9 @@ CREATE_TASK = 'Create Task'
 MODIFY_TASK = 'Modify Task'
 GET_ALL_TASKS = 'Get All Tasks'
 
+PREV = 'prev'
+NEXT = 'next'
+
 
 def display_task(bot: telebot.TeleBot, chat_id, task):
     content = get_bold_markdown(dict(task))
@@ -31,6 +35,20 @@ def display_tasks(bot: telebot.TeleBot, chat_id, response):
         task = tasks_list[i]
         bot.send_message(chat_id, "*Task " + str(i) + "*:\n", parse_mode='MARKDOWN')
         display_task(bot, chat_id, task)
+
+
+def get_choose_task_markup(info: TaskViewInfo, block_idx):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+
+    task_block_info = info.tasks_info[block_idx]
+
+    for info_text in task_block_info:
+        markup.add(types.KeyboardButton(info_text))
+
+    markup.add(types.KeyboardButton(NEXT))
+    markup.add(types.KeyboardButton(PREV))
+
+    return markup
 
 
 class ChooseModeMarkup(object):

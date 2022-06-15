@@ -140,6 +140,71 @@ def handle_user_choose_api_command(message, bot: telebot.TeleBot, bot_info: BotI
         bot_info.query_info = QueryInfo(QueryType.MODIFY_TASK)
         bot_info.change_handler_info(Mode.USER, UserState.MODIFY_TASK)
 
+        # get display info for all tasks:
+        response = get_all_tasks()
+        tasks = response[TASKS_LIST]
+        bot_info.tasks_view_info = TaskViewInfo(tasks)
+        bot_info.tasks_list = tasks
+
+        bot.send_message(bot_info.chat_id, "choose task you want to modify:",
+                         reply_markup=get_choose_task_markup(bot_info.tasks_view_info, 0))
+
+
+def handle_user_api_modify_task(message, bot: telebot.TeleBot, bot_info: BotInfo):
+    text = message.text
+    block_idx = bot_info.tasks_view_info.block_idx
+    block_count = bot_info.tasks_view_info.block_count
+
+    if text == NEXT:
+        bot_info.tasks_view_info.block_idx = (block_idx + 1) % block_count
+        bot.send_message(bot_info.chat_id, "next page", reply_markup=
+        get_choose_task_markup(bot_info.tasks_view_info, bot_info.tasks_view_info.block_idx))
+
+    elif text == PREV:
+        bot_info.tasks_view_info.block_idx = (block_idx - 1) % block_count
+        bot.send_message(bot_info.chat_id, "prev page", reply_markup=
+        get_choose_task_markup(bot_info.tasks_view_info, bot_info.tasks_view_info.block_idx))
+    else:
+        task_id = bot_info.tasks_view_info.get_task_id(text)
+
+        if task_id is None:
+            bot.send_message(bot_info.chat_id, "choose suggested task", reply_markup=
+            get_choose_task_markup(bot_info.tasks_view_info, bot_info.tasks_view_info.block_idx))
+        else:
+            task = bot_info.get_task(int(task_id))
+            bot.send_message(bot_info.chat_id, "you choose task:")
+            display_task(bot, bot_info.chat_id, task)
+            bot.send_message(bot_info.chat_id, "modifying attributes...")
+
+            # fill task id
+            id_parameter = bot_info.query_info.get_cur_parameter()
+            bot_info.query_info.query_parameters[id_parameter] = task_id
+            bot_info.query_info.next_parameter()
+
+            bot.send_message(bot_info.chat_id, "enter " + str(bot_info.query_info.get_cur_parameter()) + ":")
+            bot_info.set_state(UserState.MODIFY_TASK_PROCESS)
+
+
+def handle_user_api_modify_task_process(message, bot: telebot.TeleBot, bot_info: BotInfo):
+    text = message.text
+    cur_parameter = bot_info.query_info.get_cur_parameter()
+
+    if text != default_parameter_value:
+        bot_info.query_info.query_parameters[cur_parameter] = text
+
+    if bot_info.query_info.next_parameter() is None:  # check is the last parameter was initialized
+        response = modify_task(bot_info.query_info.query_parameters)
+
+        if response[STATUS] == FAIL:
+            bot.send_message(bot_info.chat_id, "*API exception:*\n" + response[EXCEPTION], parse_mode="MARKDOWN")
+        else:
+            bot.send_message(bot_info.chat_id, "*task modified:*", parse_mode='MARKDOWN')
+            display_task(bot, bot_info.chat_id, response[TASKS_LIST][0])
+        bot_info.change_handler_info(Mode.USER, UserState.USE_API)
+        bot.send_message(bot_info.chat_id, "choose command: ", reply_markup=chooseApiCommandMarkup)
+    else:
+        bot.send_message(bot_info.chat_id, "enter " + str(bot_info.query_info.get_cur_parameter()) + ":")
+
 
 def handle_user_api_get_all_tasks(bot: telebot.TeleBot, bot_info: BotInfo):
     # print all tasks
@@ -152,14 +217,11 @@ def handle_user_api_create_task(message, bot: telebot.TeleBot, bot_info: BotInfo
     text = message.text
     cur_parameter = bot_info.query_info.get_cur_parameter()
 
-    if text == default_parameter_value:
-        pass
-    else:
+    if text != default_parameter_value:
         bot_info.query_info.query_parameters[cur_parameter] = text
 
-    if bot_info.query_info.next_parameter() is None:    # check is the last parameter was initialized
-        response = create_task(bot_info.query_info.query_parameters)   # send request
-        print(response)
+    if bot_info.query_info.next_parameter() is None:  # check is the last parameter was initialized
+        response = create_task(bot_info.query_info.query_parameters)  # send request
 
         if response[STATUS] == FAIL:
             bot.send_message(bot_info.chat_id, "*API exception:*\n" + response[EXCEPTION], parse_mode="MARKDOWN")
