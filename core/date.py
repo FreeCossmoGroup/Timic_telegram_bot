@@ -1,4 +1,5 @@
 from enum import Enum
+import re
 
 server_address = "http://localhost:8080"
 
@@ -12,6 +13,9 @@ id = 'id'
 default_parameter_value = '-'
 create_task_body = {description: '', start_time: '', duration: '', fixed: '', parent: ''}
 modify_task_body = {id: '', description: '', start_time: '', duration: '', fixed: '', parent: ''}
+
+task_id_offset = 1
+task_dscr_re = ':|\s'
 
 
 class Mode(Enum):
@@ -54,50 +58,47 @@ class User(object):
 class UserTable(object):
     def __init__(self):
         self.users = dict()
-        self.max_id = 0
 
     def add_user(self, name: str, password: str):
         assert name is not None and password is not None
 
+        if name in self.users:
+            return False
         user = User(name, password)
-        self.max_id += 1
-        self.users[self.max_id] = user
+        self.users[name] = user
 
-        return self.max_id
+        return True
 
-    def remove_user(self, user_id: int):
-        if not (user_id in self.users):
+    def remove_user(self, name):
+        if name not in self.users:
             return False
         else:
-            self.users.pop(user_id)
-            if len(self.users) == 0:
-                self.max_id = 0
-            elif user_id == self.max_id:
-                self.max_id = max(self.users.keys())
+            self.users.pop(name)
+
             return True
 
-    def get_user(self, user_id):
-        if not (user_id in self.users):
+    def get_user(self, name):
+        if name not in self.users:
             return None
         else:
-            return self.users[user_id]
+            return self.users[name]
 
-    def refactor_user(self, user_id, name, password):
-        if not (user_id in self.users):
+    def refactor_user(self, old_name, new_name, password):
+        if old_name not in self.users or (new_name is None and password is None):
             return False
         else:
-            if name is not None:
-                self.users[user_id].name = name
+            user_id = old_name
+
+            if new_name is not None:
+                user = self.users.pop(old_name)
+                user.name = new_name
+                self.users[new_name] = user
+                user_id = new_name
+
             if password is not None:
                 self.users[user_id].password = password
 
             return True
-
-    def get_user_by_name(self, name):
-        for key in self.users:
-            if self.users[key].name == name:
-                return key
-        return -1
 
     def get_size(self):
         return len(self.users)
@@ -181,9 +182,9 @@ class QueryInfo:
 
 def get_task_info_text(task):
     char_count = 10
-    descr = task[description][:char_count]
+    dscr = task[description][:char_count]
 
-    return str(task[id]) + "\n" + descr
+    return "Task " + str(task[id]) + ": '" + dscr + "..'"
 
 
 class TaskViewInfo:
@@ -198,8 +199,8 @@ class TaskViewInfo:
 
             if i % self.block_size == 0:
                 block_idx += 1
-                self.tasks_info.append(set())
-            self.tasks_info[block_idx].add(get_task_info_text(task))
+                self.tasks_info.append(list())
+            self.tasks_info[block_idx].append(get_task_info_text(task))
 
         self.block_count = len(self.tasks_info)
         self.block_idx = 0
@@ -207,5 +208,5 @@ class TaskViewInfo:
     def get_task_id(self, text):
         for block in self.tasks_info:
             if text in block:
-                return text.split()[0]
+                return re.split(task_dscr_re, text)[task_id_offset]
         return None

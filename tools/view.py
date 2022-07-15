@@ -1,10 +1,10 @@
 import telebot
 from telebot import types
-from Tools.markdown_constructor import *
-from Core.Data import TaskViewInfo
+from tools.markdown_constructor import *
+from core.date import TaskViewInfo
 
 # Buttons text:
-from Tools.response_info import TASKS_LIST
+from tools.response_info import TASKS_LIST
 
 RESET_KEY = 'Reset Key'
 REMOVE_USER = 'Remove User'
@@ -19,8 +19,8 @@ CREATE_TASK = 'Create Task'
 MODIFY_TASK = 'Modify Task'
 GET_ALL_TASKS = 'Get All Tasks'
 
-PREV = 'prev'
-NEXT = 'next'
+PREV = '<<'
+NEXT = '>>'
 
 
 def display_task(bot: telebot.TeleBot, chat_id, task):
@@ -38,15 +38,33 @@ def display_tasks(bot: telebot.TeleBot, chat_id, response):
 
 
 def get_choose_task_markup(info: TaskViewInfo, block_idx):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-
     task_block_info = info.tasks_info[block_idx]
 
-    for info_text in task_block_info:
-        markup.add(types.KeyboardButton(info_text))
+    row_size = 2                          # count of buttons in one row
+    block_size = len(task_block_info)     # count of tasks in current block
+    row_count = (block_size // row_size) + (block_size % row_size > 0)
 
-    markup.add(types.KeyboardButton(NEXT))
-    markup.add(types.KeyboardButton(PREV))
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+
+    for row_idx in range(row_count):
+        start_task_idx = row_idx * row_size
+        buttons_list = []
+
+        # add tasks text:
+        for col_idx in range(row_size):
+            cur_task_idx = start_task_idx + col_idx
+            buttons_list.append(types.KeyboardButton(task_block_info[cur_task_idx]))
+
+            if cur_task_idx == block_size - 1:
+                break
+
+        if row_idx == row_count // 2 or row_count == 1:
+            # add PREV and NEXT buttons
+            buttons_list.insert(row_size, types.KeyboardButton(NEXT))
+            buttons_list.insert(0, types.KeyboardButton(PREV))
+
+        # add created row to the markup
+        markup.row(*buttons_list)
 
     return markup
 

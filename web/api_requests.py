@@ -1,5 +1,5 @@
 import requests
-from Core.Data import server_address
+from core.date import server_address
 
 
 def create_task(params):
