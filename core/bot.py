@@ -1,4 +1,4 @@
-from core.date import *
+from core.data import *
 from tools.config import save_config_from_bot
 from tools.view import *
 from web.api_requests import *
@@ -57,6 +57,8 @@ class Bot(object):
                     handle_user_api_modify_task(message, bot)
                 elif bot_info.state == UserState.MODIFY_TASK_PROCESS:
                     handle_user_api_modify_task_process(message, bot)
+                elif bot_info.state == UserState.SET_ATTRIBUTE_VALUE:
+                    handle_user_api_set_attribute(message, bot)
 
             bot_info = self.bot_info
             try:
@@ -97,7 +99,7 @@ def handle_login_message(message, bot_wrapper: Bot):
         bot.send_message(bot_info.chat_id, "you chosen 'Admin' mode")
         bot.send_message(bot_info.chat_id, "enter the admin key:")
     else:
-        raise Exception("choose suggested mode")
+        bot.send_message(bot_info.chat_id, "choose suggested mode:", reply_markup=chooseModeMarkup)
 
 
 def handle_admin_authentication(message, bot_wrapper: Bot):
@@ -137,7 +139,8 @@ def handle_admin_choose_action(message, bot_wrapper: Bot):
         bot.send_message(bot_info.chat_id, "logout from 'Admin'")
         bot.send_message(bot_info.chat_id, "choose mode: 'Admin' or 'User'", reply_markup=chooseModeMarkup)
     else:
-        raise Exception("choose suggested command")
+        bot.send_message(bot_info.chat_id, "choose suggested command:", reply_markup=chooseAdminActionMarkup)
+        bot.send_message(bot_info.chat_id, "choose suggested command:", reply_markup=chooseAdminActionMarkup)
 
 
 def handle_admin_add_user(message, bot_wrapper: Bot):
@@ -200,7 +203,6 @@ def handle_admin_reset_key(message, bot_wrapper: Bot):
 
 
 # user handlers:
-
 def handle_user_choose_action(message, bot_wrapper: Bot):
     bot_info = bot_wrapper.bot_info
     bot = bot_wrapper.bot
@@ -214,7 +216,7 @@ def handle_user_choose_action(message, bot_wrapper: Bot):
         bot_info.change_handler_info(Mode.LOGIN, None)
         bot.send_message(bot_info.chat_id, "logout from 'User'", reply_markup=chooseModeMarkup)
     else:
-        raise Exception("choose suggested command")
+        bot.send_message(bot_info.chat_id, "choose suggested command:", reply_markup=chooseUserActionMarkup)
 
 
 def handle_user_choose_api_command(message, bot_wrapper: Bot):
@@ -227,10 +229,11 @@ def handle_user_choose_api_command(message, bot_wrapper: Bot):
         bot_info.query_info = QueryInfo(QueryType.CREATE_TASK)
         bot_info.change_handler_info(Mode.USER, UserState.CREATE_TASK)
         bot.send_message(bot_info.chat_id, "enter " + str(bot_info.query_info.get_cur_parameter()) + ":")
+
     elif text == GET_ALL_TASKS:
-        bot_info.query_info = QueryInfo(QueryType.GET_ALL_TASKS)
         bot.send_message(bot_info.chat_id, "**created tasks:**", parse_mode='MARKDOWN')
         handle_user_api_get_all_tasks(bot_wrapper)
+
     elif text == MODIFY_TASK:
         bot_info.query_info = QueryInfo(QueryType.MODIFY_TASK)
         bot_info.change_handler_info(Mode.USER, UserState.MODIFY_TASK)
@@ -238,11 +241,17 @@ def handle_user_choose_api_command(message, bot_wrapper: Bot):
         # get display info for all tasks:
         response = get_all_tasks()
         tasks = response[TASKS_LIST]
+
         bot_info.tasks_view_info = TaskViewInfo(tasks)
         bot_info.tasks_list = tasks
 
+        first_block_idx = 0
+
         bot.send_message(bot_info.chat_id, "choose task you want to modify:",
-                         reply_markup=get_choose_task_markup(bot_info.tasks_view_info, 0))
+                         reply_markup=get_choose_task_markup(bot_info.tasks_view_info, first_block_idx))
+    else:
+        bot.send_message(bot_info.chat_id, "invalid API command - " + text + "; choose suggested:",
+                         reply_markup=chooseUserActionMarkup)
 
 
 def handle_user_api_modify_task(message, bot_wrapper: Bot):
@@ -254,57 +263,95 @@ def handle_user_api_modify_task(message, bot_wrapper: Bot):
     block_count = bot_info.tasks_view_info.block_count
 
     if text == NEXT:
-        bot_info.tasks_view_info.block_idx = (block_idx + 1) % block_count
+        bot_info.tasks_view_info.block_idx = (block_idx + 1) % block_count  # increment block idx
         bot.send_message(bot_info.chat_id, "next page", reply_markup=
         get_choose_task_markup(bot_info.tasks_view_info, bot_info.tasks_view_info.block_idx))
 
     elif text == PREV:
-        bot_info.tasks_view_info.block_idx = (block_idx - 1) % block_count
+        bot_info.tasks_view_info.block_idx = (block_idx - 1) % block_count  # decrement block idx
         bot.send_message(bot_info.chat_id, "prev page", reply_markup=
         get_choose_task_markup(bot_info.tasks_view_info, bot_info.tasks_view_info.block_idx))
+
+    elif text == DONE:
+        bot_info.change_handler_info(Mode.USER, UserState.USE_API)
+        bot.send_message(bot_info.chat_id, "choose command: ", reply_markup=chooseApiCommandMarkup)
     else:
-        task_id = bot_info.tasks_view_info.get_task_id(text)
+        task_id = bot_info.tasks_view_info.get_task_id(text)    # get task id by text from clicked task button
 
         if task_id is None:
             bot.send_message(bot_info.chat_id, "choose suggested task", reply_markup=
             get_choose_task_markup(bot_info.tasks_view_info, bot_info.tasks_view_info.block_idx))
         else:
             task = bot_info.get_task(int(task_id))
-            bot.send_message(bot_info.chat_id, "you choose task:")
-            display_task(bot, bot_info.chat_id, task)
-            bot.send_message(bot_info.chat_id, "modifying attributes...")
+            bot_info.chosen_task_view_markup = get_task_attributes_markup(dict(task))     # create task attributes view markup
 
-            # fill task id
-            id_parameter = bot_info.query_info.get_cur_parameter()
-            bot_info.query_info.query_parameters[id_parameter] = task_id
-            bot_info.query_info.next_parameter()
-
-            bot.send_message(bot_info.chat_id, "enter " + str(bot_info.query_info.get_cur_parameter()) + ":")
+            bot.send_message(bot_info.chat_id, "choose attribute to modify:",
+                             reply_markup=bot_info.chosen_task_view_markup)
+            # set id parameter
+            bot_info.query_info.query_parameters[id] = task_id
             bot_info.set_state(UserState.MODIFY_TASK_PROCESS)
+
+            bot_info.modifying_task = dict(task)
 
 
 def handle_user_api_modify_task_process(message, bot_wrapper: Bot):
-    bot_info = bot_wrapper.bot_info
     bot = bot_wrapper.bot
+    bot_info = bot_wrapper.bot_info
 
+    # get modified attribute name
     text = message.text
-    cur_parameter = bot_info.query_info.get_cur_parameter()
+    tokens = text.split(':')
+    arg = tokens[0]
 
-    if text != default_parameter_value:
-        bot_info.query_info.query_parameters[cur_parameter] = text
-
-    if bot_info.query_info.next_parameter() is None:  # check is the last parameter was initialized
+    # check is token represents an attribute name
+    if arg == DONE:
+        bot.send_message(bot_info.chat_id, "modifying task...")
         response = modify_task(bot_info.query_info.query_parameters)
 
         if response[STATUS] == FAIL:
-            bot.send_message(bot_info.chat_id, "*API exception:*\n" + response[EXCEPTION], parse_mode="MARKDOWN")
+            bot.send_message(bot_info.chat_id, "*API exception:* " + response[EXCEPTION], parse_mode="MARKDOWN")
+            bot.send_message(bot_info.chat_id, "choose attribute to modify:",
+                             reply_markup=bot_info.chosen_task_view_markup)
         else:
-            bot.send_message(bot_info.chat_id, "*task modified:*", parse_mode='MARKDOWN')
-            display_task(bot, bot_info.chat_id, response[TASKS_LIST][0])
-        bot_info.change_handler_info(Mode.USER, UserState.USE_API)
-        bot.send_message(bot_info.chat_id, "choose command: ", reply_markup=chooseApiCommandMarkup)
+            bot_info.change_handler_info(Mode.USER, UserState.MODIFY_TASK)
+
+            modifying_task = bot_info.modifying_task
+            bot_info.reset_task(modifying_task[id], modifying_task)     # reset modified task
+
+            bot.send_message(bot_info.chat_id, "task is successfully modified")
+            first_block_idx = 0
+
+            bot_info.tasks_view_info = TaskViewInfo(bot_info.tasks_list)    # update task view info
+            bot.send_message(bot_info.chat_id, "choose task you want to modify:",
+                             reply_markup=get_choose_task_markup(bot_info.tasks_view_info, first_block_idx))
+
+    elif arg not in modify_task_attributes:
+        bot.send_message(bot_info.chat_id, "choose suggested task attribute",
+                         reply_markup=bot_info.chosen_task_view_markup)
     else:
-        bot.send_message(bot_info.chat_id, "enter " + str(bot_info.query_info.get_cur_parameter()) + ":")
+        if arg == start_time_string_response:
+            arg = start_time    # change this attribute on response attribute
+        bot_info.query_info.cur_modifying_parameter = arg      # set current modified parameter
+        bot_info.change_handler_info(Mode.USER, UserState.SET_ATTRIBUTE_VALUE)
+        bot.send_message(bot_info.chat_id, "enter new value for the attribute - " + arg + ":")
+
+
+def handle_user_api_set_attribute(message, bot_wrapper: Bot):
+    bot = bot_wrapper.bot
+    bot_info = bot_wrapper.bot_info
+    text = message.text
+
+    modifying_attribute = bot_info.query_info.cur_modifying_parameter
+
+    bot_info.query_info.query_parameters[modifying_attribute] = text    # modify query info (need for back-end API call)
+    bot_info.modifying_task[modifying_attribute] = text                 # modify current task view (need for markup)
+
+    bot_info.change_handler_info(Mode.USER, UserState.MODIFY_TASK_PROCESS)
+    bot.send_message(bot_info.chat_id, "new value of attribute: " + modifying_attribute + " is cached")
+
+    # need to pass a COPY of the task:
+    bot.send_message(bot_info.chat_id, "choose attribute to modify:",
+                     reply_markup=get_task_attributes_markup(dict(bot_info.modifying_task)))
 
 
 def handle_user_api_get_all_tasks(bot_wrapper: Bot):
@@ -331,7 +378,8 @@ def handle_user_api_create_task(message, bot_wrapper: Bot):
         response = create_task(bot_info.query_info.query_parameters)  # send request
 
         if response[STATUS] == FAIL:
-            bot.send_message(bot_info.chat_id, "*API exception:*\n" + response[EXCEPTION], parse_mode="MARKDOWN")
+            bot.send_message(bot_info.chat_id, "*API exception:*\n" + response[EXCEPTION],
+                             parse_mode="MARKDOWN", reply_markup=chooseApiCommandMarkup)
         else:
             bot.send_message(bot_info.chat_id, "*task created:*", parse_mode='MARKDOWN')
             display_task(bot, bot_info.chat_id, response[TASKS_LIST][0])

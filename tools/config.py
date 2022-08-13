@@ -1,7 +1,7 @@
 import pickle
 from pathlib import Path
 
-from core.date import UserTable, BotInfo
+from core.data import UserTable, BotInfo
 
 config_file_path = Path("resources/config.pickle")
 

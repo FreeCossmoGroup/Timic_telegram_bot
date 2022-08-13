@@ -9,7 +9,7 @@ if __name__ == '__main__':
         if string == 'False':
             return False
         else:
-            raise ValueError() # will be handled in parse_args() method
+            raise ValueError()  # will be handled in parse_args() method
 
     parser = argparse.ArgumentParser()
     parser.add_argument('token', help="your telegram API token")

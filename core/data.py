@@ -3,6 +3,7 @@ import re
 
 server_address = "http://localhost:8080"
 
+# fields names in API requests:
 description = 'description'
 start_time = 'stime'
 duration = 'duration'
@@ -10,12 +11,19 @@ fixed = 'fixed'
 parent = 'parent'
 id = 'id'
 
+# fields names in API response JSON:
+start_time_response = 'startTime'
+start_time_string_response = 'startTimeString'
+
+# displayed task attributes for modifying:
+modify_task_attributes = [description, start_time_string_response, duration, fixed, parent]
+
 default_parameter_value = '-'
 create_task_body = {description: '', start_time: '', duration: '', fixed: '', parent: ''}
 modify_task_body = {id: '', description: '', start_time: '', duration: '', fixed: '', parent: ''}
 
 task_id_offset = 1
-task_dscr_re = ':|\s'
+task_description_re = ':|\s'
 
 
 class Mode(Enum):
@@ -33,6 +41,7 @@ class UserState(Enum):
     CREATE_TASK = 6
     MODIFY_TASK = 7
     MODIFY_TASK_PROCESS = 8
+    SET_ATTRIBUTE_VALUE = 9
 
 
 class QueryType(Enum):
@@ -118,6 +127,8 @@ class BotInfo(object):
         self.tasks_view_info = None
         self.choose_task_info = None
         self.tasks_list = None
+        self.chosen_task_view_markup = None
+        self.modifying_task = None
 
     def set_state(self, state):
         self.state = state
@@ -144,6 +155,13 @@ class BotInfo(object):
                 return task
         return None
 
+    def reset_task(self, task_id, new_task):
+        for i in range(len(self.tasks_list)):
+            task = self.tasks_list[i]
+
+            if task[id] == task_id:
+                self.tasks_list[i] = new_task
+
 
 def get_create_task_parameters():
     return dict(create_task_body)
@@ -168,6 +186,7 @@ class QueryInfo:
             self.query_parameters = get_task_parameters(type)
             self.parameter_count = len(self.query_parameters)
             self.cur_parameter_idx = 0
+            self.cur_modifying_parameter = None
 
     def next_parameter(self):
         self.cur_parameter_idx += 1
@@ -189,7 +208,7 @@ def get_task_info_text(task):
 
 class TaskViewInfo:
     def __init__(self, tasks: list):
-        self.block_size = 4         # count of tasks on screen
+        self.block_size = 10         # count of tasks on screen
         self.tasks_info = []
 
         block_idx = -1
@@ -208,5 +227,5 @@ class TaskViewInfo:
     def get_task_id(self, text):
         for block in self.tasks_info:
             if text in block:
-                return re.split(task_dscr_re, text)[task_id_offset]
+                return re.split(task_description_re, text)[task_id_offset]
         return None
